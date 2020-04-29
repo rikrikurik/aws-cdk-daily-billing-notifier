@@ -1,0 +1,6 @@
+{
+  "@aws-cdk/core:enableStackNameDuplicates": "true",
+  "system_name": "DailyBillingNotifier",
+  "env": "prod",
+  "aws-cdk:enableDiffNoFail": "true"
+}

@@ -62,7 +62,7 @@ export class NotifierStack extends cdk.Stack {
         functionName: function_name,
         runtime: lambda.Runtime.PYTHON_3_8,
         code: lambda.AssetCode.fromAsset('lambda'),
-        handler: 'email_notifier.handler',
+        handler: 'notifier.handler',
         timeout: cdk.Duration.seconds(300),
         environment: {
           "ACCOUNT_NUMBER": this.account,

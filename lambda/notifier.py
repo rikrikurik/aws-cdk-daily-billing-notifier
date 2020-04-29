@@ -9,7 +9,7 @@ WEBHOOK_URL = os.environ['WEBHOOK_URL']
 SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
 
 
-def lambda_handler(event, context) -> None:
+def handler(event, context) -> None:
     client = boto3.client('ce', region_name='us-east-1')
     # Get billing info
     total_billing = get_total_billing(client)

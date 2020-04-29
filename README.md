@@ -3,8 +3,8 @@
 This is an AWS daily billing notification sender stack
 managed by [AWS CDK](https://docs.aws.amazon.com/cdk/api/latest/).
 
-Daily notification message will be sent to a webhook url (slack etc.) and/or an e-mail 
-which tells you the total and per-service amaount of the billing from 1st of month to today.
+Daily notification message will be sent to a webhook url (slack etc.) and/or an e-mail address
+which tells you the total and per-service amount of the billing from 1st of month to today.
 
 
 ## Architecture

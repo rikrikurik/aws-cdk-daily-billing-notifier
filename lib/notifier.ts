@@ -18,8 +18,7 @@ export class NotifierStack extends cdk.Stack {
   public readonly daily_event: events.Rule;
   public readonly function: lambda.Function;
   public readonly function_role: iam.Role;
-  public readonly email_sns_topic: sns.Topic;
-  public readonly email_subscription: subscriptions.EmailSubscription;
+  public readonly email_sns_topic_arn: string | undefined;
 
   constructor(scope: cdk.Construct, id: string, props: NotifierStackProps) {
     super(scope, id, props);
@@ -27,12 +26,13 @@ export class NotifierStack extends cdk.Stack {
     // Create sns subscription and topic if an email address is defined.
     if (props.email_address) {
       const topic_name = props.resource_name.topic_name('billing')
-      this.email_subscription = new subscriptions.EmailSubscription(props.email_address)
-      this.email_sns_topic = new sns.Topic(this, topic_name, {
+      const email_subscription = new subscriptions.EmailSubscription(props.email_address)
+      const email_sns_topic = new sns.Topic(this, topic_name, {
         topicName: topic_name,
         displayName: 'Send daily billing info'
       })
-      this.email_sns_topic.addSubscription(this.email_subscription)
+      email_sns_topic.addSubscription(email_subscription)
+      this.email_sns_topic_arn = email_sns_topic.topicArn
     }
 
     // Lambda function role
@@ -67,7 +67,7 @@ export class NotifierStack extends cdk.Stack {
         environment: {
           "ACCOUNT_NUMBER": this.account,
           "WEBHOOK_URL": props.webhook_url ? props.webhook_url : "",
-          "SNS_TOPIC_ARN": this.email_sns_topic ? this.email_sns_topic.topicArn : ""
+          "SNS_TOPIC_ARN": this.email_sns_topic_arn ? this.email_sns_topic_arn : ""
         },
         role: this.function_role
       }

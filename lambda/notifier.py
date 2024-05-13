@@ -74,9 +74,8 @@ def generate_send_message(total_billing: dict, service_billings: list) -> (str, 
     end = (today - timedelta(days=1)).strftime('%m/%d')
     total = round(float(total_billing['billing']), 2)
 
-    title = (
-        f'[AWS daily billing notify] '
-        f'{ACCOUNT_NUMBER} ({start}-{end}): {total:.2f} USD.'
+    summary = (
+        f' ({start}-{end}): {total:.2f} USD'
     )
 
     details = []
@@ -86,9 +85,17 @@ def generate_send_message(total_billing: dict, service_billings: list) -> (str, 
 
         if billing == 0.0:
             continue
-        details.append(f'　・{service_name}: {billing:.2f} USD')
+        details.append(f'・{service_name}: {billing:.2f} USD')
 
-    return title, '\n'.join(details)
+    def pick_notification_color(total_cost):
+        if total_cost < 15:
+            return 5620992
+        elif total_cost < 30:
+            return 14912796
+        else:
+            return 13382451
+
+    return summary, '\n'.join(details), pick_notification_color(total)
 
 
 def get_total_cost_date_range() -> (str, str):
@@ -118,14 +125,20 @@ def get_today() -> str:
     return date.today().isoformat()
 
 
-def send_to_discord_webhook(title: str, detail: str) -> None:
+def send_to_discord_webhook(summary: str, details: str, embed_color) -> None:
     """Send message to Discord webhook"""
     # Generate request body
     username = 'AWS Daily Billing Notifier'
+    description = "\nPer Service Billing\n" + details
     payload = {
         "username": username,
-        'content': title,
-        # "avatar_url": avatar_url,
+        "embeds": [
+            {
+                "title": f"ACCOUNT: {ACCOUNT_NUMBER}" + summary,
+                "color": embed_color,
+                "description": description,
+            }
+        ]
     }
 
     # Send request
@@ -152,12 +165,12 @@ def handler(event, context) -> None:
     total_billing = get_total_billing_amount(client)
     service_billings = get_per_service_billing_amount(client)
     # create message
-    (title, detail) = generate_send_message(total_billing, service_billings)
-    logger.info(f'{title=}, {detail=}')
+    (summary, detail, color) = generate_send_message(total_billing, service_billings)
+    logger.info(f'{summary=}, {detail=}')
     # send message
     if WEBHOOK_URL:
         logger.info(f'Send to webhook url {WEBHOOK_URL}')
-        send_to_discord_webhook(title, detail)
+        send_to_discord_webhook(summary, detail, color)
     if SNS_TOPIC_ARN:
         logger.info(f'Send to sns topic arn {SNS_TOPIC_ARN}')
-        send_to_sns_topic(title, detail)
+        send_to_sns_topic(summary, detail)

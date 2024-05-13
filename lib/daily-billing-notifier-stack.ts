@@ -1,52 +1,53 @@
-import * as cdk from '@aws-cdk/core';
-import iam = require('@aws-cdk/aws-iam');
-import events = require('@aws-cdk/aws-events');
-import targets = require('@aws-cdk/aws-events-targets');
-import lambda = require('@aws-cdk/aws-lambda');
-// import dest = require('@aws-cdk/aws-lambda-destinations');
-import sns = require('@aws-cdk/aws-sns');
-import subscriptions = require('@aws-cdk/aws-sns-subscriptions');
-import { ResourceName } from '../lib/resource_name';
+import { ResourceName } from './resource-name';
+import * as cdk from 'aws-cdk-lib';
+import { Construct } from 'constructs';
 
-interface NotifierStackProps extends cdk.StackProps {
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+
+interface DailyBillingNotifierStackProps extends cdk.StackProps {
   resource_name: ResourceName;
   webhook_url?: string;
   email_address?: string;
 }
 
-export class NotifierStack extends cdk.Stack {
+export class DailyBillingNotifierStack extends cdk.Stack {
   public readonly daily_event: events.Rule;
   public readonly function: lambda.Function;
   public readonly function_role: iam.Role;
   public readonly email_sns_topic_arn: string | undefined;
 
-  constructor(scope: cdk.Construct, id: string, props: NotifierStackProps) {
+  constructor(scope: Construct, id: string, props: DailyBillingNotifierStackProps) {
     super(scope, id, props);
 
     // Create sns subscription and topic if an email address is defined.
     if (props.email_address) {
-      const topic_name = props.resource_name.topic_name('billing')
-      const email_subscription = new subscriptions.EmailSubscription(props.email_address)
+      const topic_name = props.resource_name.topic_name('email');
+      const email_subscription = new subscriptions.EmailSubscription(props.email_address);
       const email_sns_topic = new sns.Topic(this, topic_name, {
         topicName: topic_name,
         displayName: 'Send daily billing info'
-      })
-      email_sns_topic.addSubscription(email_subscription)
-      this.email_sns_topic_arn = email_sns_topic.topicArn
+      });
+      email_sns_topic.addSubscription(email_subscription);
+      this.email_sns_topic_arn = email_sns_topic.topicArn;
     }
 
     // Lambda function role
-    const function_name = props.resource_name.lambda_name('notifier')
-    const function_role_name = `${function_name}-role`
+    const function_name = props.resource_name.lambda_name();
+    const function_role_name = `${function_name}-role`;
     this.function_role = new iam.Role(this, function_role_name,
       {
         assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-        description: 'Daily billing infomation notifier execution role',
+        description: 'Daily billing notifier execution role',
         managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName(
           'service-role/AWSLambdaBasicExecutionRole')],
-        roleName: function_role_name
+        roleName: function_role_name,
       }
-    )
+    );
     this.function_role.addToPolicy(new iam.PolicyStatement({
       actions: [
         "ce:GetCostAndUsage",
@@ -54,7 +55,7 @@ export class NotifierStack extends cdk.Stack {
       ],
       effect: iam.Effect.ALLOW,
       resources: ["*"]
-    }))
+    }));
 
     // Notifier lambda function
     this.function = new lambda.Function(this, function_name,
@@ -67,11 +68,11 @@ export class NotifierStack extends cdk.Stack {
         environment: {
           "ACCOUNT_NUMBER": this.account,
           "WEBHOOK_URL": props.webhook_url ? props.webhook_url : "",
-          "SNS_TOPIC_ARN": this.email_sns_topic_arn ? this.email_sns_topic_arn : ""
+          "SNS_TOPIC_ARN": this.email_sns_topic_arn ? this.email_sns_topic_arn : "",
         },
-        role: this.function_role
+        role: this.function_role,
       }
-    )
+    );
 
     // Add daily trigger event
     const rule_name = `${function_name}-eventrule`
@@ -79,7 +80,7 @@ export class NotifierStack extends cdk.Stack {
       ruleName: rule_name,
       description: "Daily scheduled event for lambda execution",
       schedule: events.Schedule.expression("cron(0 0 * * ? *)")
-    })
+    });
     this.daily_event.addTarget(new targets.LambdaFunction(this.function));
 
   }

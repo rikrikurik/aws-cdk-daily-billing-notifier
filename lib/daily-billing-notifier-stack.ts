@@ -57,11 +57,21 @@ export class DailyBillingNotifierStack extends cdk.Stack {
       resources: ["*"]
     }));
 
+    // Create a lambda layer for the notifier function
+    const layer_name = `${function_name}-layer`;
+    const layer = new lambda.LayerVersion(this, layer_name, {
+      layerVersionName: layer_name,
+      code: lambda.Code.fromAsset('lambda_layer'),
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_12],
+      license: 'Apache-2.0',
+      description: 'A layer to include required modules for the daily billing notifier lambda',
+    });
+
     // Notifier lambda function
     this.function = new lambda.Function(this, function_name,
       {
         functionName: function_name,
-        runtime: lambda.Runtime.PYTHON_3_8,
+        runtime: lambda.Runtime.PYTHON_3_12,
         code: lambda.AssetCode.fromAsset('lambda'),
         handler: 'notifier.handler',
         timeout: cdk.Duration.seconds(300),
@@ -71,6 +81,7 @@ export class DailyBillingNotifierStack extends cdk.Stack {
           "SNS_TOPIC_ARN": this.email_sns_topic_arn ? this.email_sns_topic_arn : "",
         },
         role: this.function_role,
+        layers: [layer],
       }
     );
 

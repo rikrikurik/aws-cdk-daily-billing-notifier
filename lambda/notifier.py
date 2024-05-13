@@ -1,7 +1,8 @@
 import os
 import boto3
+import logging
 import json
-import urllib.request as urlrequest
+import requests
 from datetime import datetime, timedelta, date
 
 ACCOUNT_NUMBER = os.environ['ACCOUNT_NUMBER']
@@ -9,30 +10,27 @@ WEBHOOK_URL = os.environ['WEBHOOK_URL']
 SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
 
 
-def handler(event, context) -> None:
-    client = boto3.client('ce', region_name='us-east-1')
-    # Get billing info
-    total_billing = get_total_billing(client)
-    service_billings = get_service_billings(client)
-    # create message
-    (title, detail) = create_message(total_billing, service_billings)
-    # send message
-    if WEBHOOK_URL:
-        print(f'Send to webhook url {WEBHOOK_URL}')
-        send_to_webhook(title, detail)
-    if SNS_TOPIC_ARN:
-        print(f'Send to sns topic arn {SNS_TOPIC_ARN}')
-        send_to_sns_topic(title, detail)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter(
+    '[%(levelname)s]\t%(asctime)s.%(msecs)dZ\t%(aws_request_id)s\t%(filename)s\t%(funcName)s\t%(lineno)d\t%(message)s\n',
+    '%Y-%m-%dT%H:%M:%S'
+)
+for handler in logger.handlers:
+    handler.setFormatter(formatter)
 
 
-def get_total_billing(client) -> dict:
+def get_total_billing_amount(client) -> dict:
+    """Get total billing amount from AWS Cost Explorer API"""
     (start_date, end_date) = get_total_cost_date_range()
-    response = client.get_cost_and_usage(TimePeriod={
-        'Start': start_date,
-        'End': end_date
-    },
+    response = client.get_cost_and_usage(
+        TimePeriod={
+            'Start': start_date,
+            'End': end_date
+        },
         Granularity='MONTHLY',
-        Metrics=['AmortizedCost'])
+        Metrics=['AmortizedCost']
+    )
     return {
         'start':
         response['ResultsByTime'][0]['TimePeriod']['Start'],
@@ -43,12 +41,14 @@ def get_total_billing(client) -> dict:
     }
 
 
-def get_service_billings(client) -> list:
+def get_per_service_billing_amount(client) -> list:
+    """Get per service billing amount from AWS Cost Explorer API"""
     (start_date, end_date) = get_total_cost_date_range()
-    response = client.get_cost_and_usage(TimePeriod={
-        'Start': start_date,
-        'End': end_date
-    },
+    response = client.get_cost_and_usage(
+        TimePeriod={
+            'Start': start_date,
+            'End': end_date
+        },
         Granularity='MONTHLY',
         Metrics=['AmortizedCost'],
         GroupBy=[{
@@ -66,14 +66,18 @@ def get_service_billings(client) -> list:
     return billings
 
 
-def create_message(total_billing: dict, service_billings: list) -> (str, str):
+def generate_send_message(total_billing: dict, service_billings: list) -> (str, str):
+    """Generate message for sending"""
     start = datetime.strptime(total_billing['start'],
                               '%Y-%m-%d').strftime('%m/%d')
     today = datetime.strptime(total_billing['end'], '%Y-%m-%d')
     end = (today - timedelta(days=1)).strftime('%m/%d')
     total = round(float(total_billing['billing']), 2)
 
-    title = f'[AWS daily billing notify] {ACCOUNT_NUMBER} ({start}-{end}): {total:.2f} USD.'
+    title = (
+        f'[AWS daily billing notify] '
+        f'{ACCOUNT_NUMBER} ({start}-{end}): {total:.2f} USD.'
+    )
 
     details = []
     for item in service_billings:
@@ -88,6 +92,7 @@ def create_message(total_billing: dict, service_billings: list) -> (str, str):
 
 
 def get_total_cost_date_range() -> (str, str):
+    """Get date range to calculate total cost using AWS Cost Explorer API"""
     start_date = get_begin_of_month()
     end_date = get_today()
     if start_date == end_date:
@@ -99,37 +104,60 @@ def get_total_cost_date_range() -> (str, str):
 
 
 def get_begin_of_month() -> str:
+    """Get the first day of the month in ISO format"""
     return date.today().replace(day=1).isoformat()
 
 
 def get_prev_day(prev: int) -> str:
+    """Get the date of the previous day in ISO format"""
     return (date.today() - timedelta(days=prev)).isoformat()
 
 
 def get_today() -> str:
+    """Get today's date in ISO format"""
     return date.today().isoformat()
 
 
-def send_to_webhook(title: str, detail: str) -> None:
-    send_data = {
-        "username": "AWS daily billing",
-        'color': '#36a64f',
-        'pretext': title,
-        'text': detail
+def send_to_discord_webhook(title: str, detail: str) -> None:
+    """Send message to Discord webhook"""
+    # Generate request body
+    username = 'AWS Daily Billing Notifier'
+    payload = {
+        "username": username,
+        'content': title,
+        # "avatar_url": avatar_url,
     }
-    request = urlrequest.Request(
-        WEBHOOK_URL,
-        data=("payload=" + json.dumps(send_data)).encode('utf-8'),
-        method="POST"
-    )
-    with urlrequest.urlopen(request) as response:
-        response_body = response.read().decode('utf-8')
-        print(response_body)
+
+    # Send request
+    endpoint = WEBHOOK_URL + "?wait=true"
+    response = requests.post(endpoint, json=payload)
+    logger.info(response.status_code)
+    logger.info(json.dumps(json.loads(response.content),
+                indent=4, ensure_ascii=False))
 
 
 def send_to_sns_topic(title: str, detail: str) -> None:
+    """Send message to SNS topic"""
     sns_client = boto3.client('sns')
-    response = sns_client.publish(TopicArn=SNS_TOPIC_ARN,
-                                  Subject=title,
-                                  Message=detail)
-    print(response)
+    sns_response = sns_client.publish(TopicArn=SNS_TOPIC_ARN,
+                                      Subject=title,
+                                      Message=detail)
+    logging.info(f"{sns_response=}")
+
+
+def handler(event, context) -> None:
+    """Main handler function"""
+    client = boto3.client('ce', region_name='us-east-1')
+    # Get billing info
+    total_billing = get_total_billing_amount(client)
+    service_billings = get_per_service_billing_amount(client)
+    # create message
+    (title, detail) = generate_send_message(total_billing, service_billings)
+    logger.info(f'{title=}, {detail=}')
+    # send message
+    if WEBHOOK_URL:
+        logger.info(f'Send to webhook url {WEBHOOK_URL}')
+        send_to_discord_webhook(title, detail)
+    if SNS_TOPIC_ARN:
+        logger.info(f'Send to sns topic arn {SNS_TOPIC_ARN}')
+        send_to_sns_topic(title, detail)

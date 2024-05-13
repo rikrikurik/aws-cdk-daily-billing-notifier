@@ -85,7 +85,7 @@ def generate_send_message(total_billing: dict, service_billings: list) -> (str, 
 
         if billing == 0.0:
             continue
-        details.append(f'・{service_name}: {billing:.2f} USD')
+        details.append(f'- {service_name}: {billing:.2f} USD')
 
     def pick_notification_color(total_cost):
         if total_cost < 15:
@@ -129,7 +129,7 @@ def send_to_discord_webhook(summary: str, details: str, embed_color) -> None:
     """Send message to Discord webhook"""
     # Generate request body
     username = 'AWS Daily Billing Notifier'
-    description = "\nPer Service Billing\n" + details
+    description = "\nPer Service Billing\n" + (details if details else "- No billing until today")
     payload = {
         "username": username,
         "embeds": [

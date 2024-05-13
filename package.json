@@ -1,8 +1,8 @@
 {
-  "name": "daily_billing_notify",
-  "version": "0.1.0",
+  "name": "daily-billing-notifier",
+  "version": "1.0.0",
   "bin": {
-    "daily_billing_notify": "bin/daily_billing_notify.js"
+    "daily-billing-notifier": "bin/daily-billing-notifier.js"
   },
   "scripts": {
     "build": "tsc",
@@ -11,24 +11,17 @@
     "cdk": "cdk"
   },
   "devDependencies": {
-    "@aws-cdk/assert": "1.35.0",
-    "@types/jest": "^25.2.1",
-    "@types/node": "10.17.5",
-    "aws-cdk": "1.35.0",
-    "jest": "^25.5.0",
-    "ts-jest": "^25.3.1",
-    "ts-node": "^8.1.0",
-    "typescript": "~3.7.2"
+    "@types/jest": "^29.5.12",
+    "@types/node": "20.12.7",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "aws-cdk": "2.141.0",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.4.5"
   },
   "dependencies": {
-    "@aws-cdk/aws-events": "^1.36.0",
-    "@aws-cdk/aws-events-targets": "^1.36.0",
-    "@aws-cdk/aws-iam": "^1.36.0",
-    "@aws-cdk/aws-lambda": "^1.36.0",
-    "@aws-cdk/aws-lambda-destinations": "^1.36.0",
-    "@aws-cdk/aws-sns": "^1.36.0",
-    "@aws-cdk/aws-sns-subscriptions": "^1.36.0",
-    "@aws-cdk/core": "1.36.0",
-    "source-map-support": "^0.5.16"
+    "aws-cdk-lib": "2.141.0",
+    "constructs": "^10.0.0",
+    "source-map-support": "^0.5.21"
   }
 }

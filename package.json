@@ -1,6 +1,6 @@
 {
   "name": "daily-billing-notifier",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "bin": {
     "daily-billing-notifier": "bin/daily-billing-notifier.js"
   },
